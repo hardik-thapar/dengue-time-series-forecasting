@@ -1,0 +1,316 @@
+\documentclass[10pt,twocolumn]{article}
+
+\usepackage[a4paper,margin=0.75in]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{hyperref}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{parskip}
+\usepackage{balance}
+
+\setlength{\columnsep}{0.25in}
+\captionsetup{font=footnotesize,labelfont=bf}
+\titleformat{\section}{\bfseries\large}{\thesection}{1em}{}
+\titleformat{\subsection}{\bfseries\normalsize}{\thesubsection}{1em}{}
+
+\title{
+\textbf{Dengue Time-Series Forecasting}\\
+\vspace{0.3cm}
+\large A Structured Machine Learning Approach Using Climate and Temporal Features
+}
+
+\author{
+Hardik Thapar\\
+Independent Technical Project\\
+\vspace{0.2cm}
+\small \texttt{hardikthapar1@gmail.com}
+}
+
+\date{}
+
+\begin{document}
+
+\twocolumn[
+\maketitle
+\vspace{-1cm}
+\begin{abstract}
+This report presents the development of a structured machine learning pipeline for forecasting weekly dengue cases in San Juan (Puerto Rico) and Iquitos (Peru) using environmental and temporal data. The project began with conventional regression baselines and evolved into a time-aware modeling system incorporating autoregressive lag features and strict chronological validation. Performance improved from baseline MAE values of approximately 30 to 11.8 for San Juan and 4.7 for Iquitos under cross-validation. The emphasis of this work lies in disciplined methodology, proper validation design, and systematic feature engineering rather than algorithmic novelty.
+\end{abstract}
+\vspace{0.5cm}
+]
+
+% ------------------------------------------------------------
+\section{Project Motivation and Objective}
+
+Dengue fever is a climate-sensitive mosquito-borne disease whose transmission dynamics are closely linked to environmental conditions and seasonal variation. Predicting weekly dengue case counts is a practical forecasting problem with real-world public health implications.
+
+The objective of this project was to build a reliable forecasting model capable of predicting weekly dengue incidence using structured environmental data and historical case information.
+
+The guiding principles of this project were:
+
+\begin{itemize}[noitemsep]
+\item Build from simple baselines upward.
+\item Respect the temporal structure of the data.
+\item Evaluate models under realistic deployment conditions.
+\item Focus on interpretability and robustness.
+\end{itemize}
+
+Rather than pursuing complex deep learning architectures, this work focused on extracting maximum predictive value from structured features and disciplined validation.
+
+% ------------------------------------------------------------
+\section{Dataset Overview}
+
+The dataset was sourced from the DrivenData DengAI competition. It consists of weekly records indexed by:
+
+\[
+(city, year, weekofyear)
+\]
+
+Two cities were modeled independently due to differing climatic and epidemiological patterns:
+
+\begin{itemize}[noitemsep]
+\item San Juan, Puerto Rico
+\item Iquitos, Peru
+\end{itemize}
+
+Each weekly observation contains:
+
+\begin{itemize}[noitemsep]
+\item Weather station temperature measurements
+\item Precipitation data
+\item Reanalysis humidity metrics
+\item Vegetation indices (NDVI)
+\item Observed dengue case counts (target variable)
+\end{itemize}
+
+The performance metric used throughout this project is Mean Absolute Error (MAE):
+
+\[
+MAE = \frac{1}{n} \sum_{i=1}^{n} |y_i - \hat{y}_i|
+\]
+
+The test set is strictly a future hold-out set, requiring chronological validation during model development.
+
+% ------------------------------------------------------------
+\section{Exploratory Data Analysis}
+
+Initial exploratory analysis focused on understanding the structure of the target variable.
+
+Key observations:
+
+\begin{itemize}[noitemsep]
+\item Long periods of low case counts.
+\item Sudden outbreak spikes.
+\item Strong temporal continuity between consecutive weeks.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{images/san_juan_weekly_cases.png}
+\caption{Weekly dengue cases – San Juan}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{images/iquitos_weekly_cases.png}
+\caption{Weekly dengue cases – Iquitos}
+\end{figure}
+
+These plots clearly indicated that weekly cases are not independent observations. Instead, they exhibit outbreak dynamics with momentum and persistence.
+
+This shifted the modeling strategy from conventional tabular regression toward time-aware modeling.
+
+% ------------------------------------------------------------
+\section{Baseline Modeling}
+
+Five climate variables were selected based on correlation analysis and domain plausibility:
+
+\begin{itemize}[noitemsep]
+\item Specific humidity
+\item Dew point temperature
+\item Average temperature
+\item Minimum temperature
+\item Precipitation
+\end{itemize}
+
+Two baseline models were implemented:
+
+\begin{itemize}[noitemsep]
+\item Linear Regression
+\item Random Forest Regressor
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{Baseline Performance (MAE)}
+\begin{tabular}{lcc}
+\toprule
+Model & San Juan & Iquitos \\
+\midrule
+Linear Regression & 30 & 31 \\
+Random Forest & 31 & 31 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The models struggled to capture outbreak spikes, indicating that static climate variables alone were insufficient.
+
+% ------------------------------------------------------------
+\section{Temporal Feature Engineering}
+
+To incorporate outbreak momentum, autoregressive features were introduced:
+
+\begin{itemize}[noitemsep]
+\item Lag 1–4 weeks
+\item Rolling mean (4 weeks)
+\item Rolling mean (8 weeks)
+\item Rolling standard deviation (4 weeks)
+\end{itemize}
+
+All lag and rolling features were computed using strictly past observations.
+
+These features allowed the model to capture:
+
+\begin{itemize}[noitemsep]
+\item Short-term outbreak acceleration
+\item Medium-term seasonal buildup
+\item Volatility in recent case counts
+\end{itemize}
+
+The addition of temporal features significantly increased predictive capacity.
+
+% ------------------------------------------------------------
+\section{Model Selection and Training}
+
+CatBoost Regressor was selected due to:
+
+\begin{itemize}[noitemsep]
+\item Strong performance on structured tabular data
+\item Robust handling of nonlinear feature interactions
+\item Stable optimization under MAE loss
+\end{itemize}
+
+A log transformation was applied to stabilize variance:
+
+\[
+y' = \log(1 + y)
+\]
+
+Predictions were inverse-transformed prior to evaluation.
+
+Hyperparameters were tuned manually based on cross-validation performance.
+
+% ------------------------------------------------------------
+\section{Validation Strategy}
+
+A 5-fold TimeSeriesSplit approach was used to simulate realistic forecasting conditions.
+
+Each fold ensured:
+
+\begin{itemize}[noitemsep]
+\item Training data precedes validation data chronologically
+\item No shuffling of time indices
+\item Validation mimics future prediction
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{Cross-Validated Performance}
+\begin{tabular}{lcc}
+\toprule
+City & Mean MAE & Std \\
+\midrule
+San Juan & 11.8 & 2.1 \\
+Iquitos & 4.7 & 1.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+These results represent stable, reproducible performance under realistic evaluation.
+
+% ------------------------------------------------------------
+\section{Model Diagnostics and Interpretability}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{images/actual_vs_predicted_san_juan.png}
+\caption{Actual vs Predicted – San Juan}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{images/error_distr.png}
+\caption{Prediction Error Distribution}
+\end{figure}
+
+The model successfully captured outbreak spikes while maintaining low bias during flat periods.
+
+Feature importance analysis revealed that autoregressive lag variables were among the strongest predictors.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{images/sj_feature_importance.png}
+\caption{Feature Importance – San Juan}
+\end{figure}
+
+This confirms that temporal momentum is a primary driver of dengue incidence.
+
+% ------------------------------------------------------------
+\balance
+\section{Workflow Summary}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{images/detailed_workflow.png}
+\caption{End-to-End Modeling Workflow}
+\end{figure}
+
+The workflow consists of:
+
+\begin{enumerate}[noitemsep]
+\item Data ingestion and preprocessing
+\item Feature selection
+\item Temporal feature engineering
+\item Chronological cross-validation
+\item Hyperparameter tuning
+\item Final model training
+\end{enumerate}
+
+% ------------------------------------------------------------
+
+\section{Final Results}
+
+Performance improved substantially over baseline:
+
+\begin{itemize}[noitemsep]
+\item Baseline MAE: ~30
+\item Final CV MAE (San Juan): 11.8
+\item Final CV MAE (Iquitos): 4.7
+\end{itemize}
+
+The primary improvement driver was structured temporal modeling rather than architectural complexity.
+
+% ------------------------------------------------------------
+\section{Key Learnings}
+
+\begin{itemize}
+\item Time dependency dominates outbreak forecasting.
+\item Proper validation design determines credibility.
+\item Simple feature engineering can outperform naive ensemble upgrades.
+\item Interpretability and robustness matter as much as accuracy.
+\end{itemize}
+
+% ------------------------------------------------------------
+\section{Conclusion}
+
+This project demonstrates that disciplined methodology and temporal awareness are critical in epidemiological forecasting tasks.
+
+By respecting chronological structure and systematically engineering lag features, substantial performance improvements were achieved over baseline regression models.
+
+The final system is reproducible, interpretable, and suitable for practical forecasting applications using structured environmental data.
+
+\end{document}
